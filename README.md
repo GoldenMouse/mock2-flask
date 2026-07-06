@@ -48,20 +48,31 @@ databricks apps deploy marketarm-app \
   --source-code-path /Workspace/Users/<you>/marketarm-app
 ```
 
-## Run locally
+## Run locally (mock data — no Databricks needed)
 
-Local runs need Databricks auth in your environment (e.g. a configured CLI
-profile) and a reachable warehouse:
+The app uses an in-memory **mock backend** (seeded rows in `data.py`) whenever
+no warehouse is configured, so you can develop the UI and CRUD flow completely
+offline. A yellow **MOCK DATA** badge appears in the header when this is active.
 
-```bash
-python -m venv .venv && . .venv/Scripts/activate   # Windows: .venv\Scripts\activate
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+python app.py            # http://localhost:8000
+```
 
-export DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
-export DATABRICKS_TOKEN=<pat>
-export DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<warehouse-id>
+Mock data lives in memory only: changes reset each time you restart the
+process. Force mock mode even when a warehouse is set with `USE_MOCK=1`.
 
-python app.py    # http://localhost:8000
+## Run locally against a real warehouse
+
+Set the three env vars and mock mode turns off automatically:
+
+```powershell
+$env:DATABRICKS_HOST      = "https://<workspace>.cloud.databricks.com"
+$env:DATABRICKS_TOKEN     = "<personal-access-token>"
+$env:DATABRICKS_HTTP_PATH = "/sql/1.0/warehouses/<warehouse-id>"
+python app.py            # http://localhost:8000
 ```
 
 ## Notes

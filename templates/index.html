@@ -93,12 +93,24 @@
     .pill.off { background: rgba(148,163,184,.15); color: var(--muted); }
     .empty { padding: 40px; text-align: center; color: var(--muted); }
     .desc-cell { max-width: 280px; white-space: normal; }
+    .badge-mock {
+      margin-left: auto;
+      background: rgba(250,204,21,.15);
+      color: #facc15;
+      border: 1px solid rgba(250,204,21,.4);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>MarketArm</h1>
     <span class="sub">spark_catalog.marketarm.tblentry · {{ entries|length }} entries · {{ now }} UTC</span>
+    {% if mock %}<span class="badge-mock">MOCK DATA</span>{% endif %}
   </header>
 
   <main>
