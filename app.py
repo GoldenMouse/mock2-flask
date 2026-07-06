@@ -11,6 +11,7 @@ with mock data, it returns a stand-in "local dev" user.
 """
 
 import os
+import threading
 from functools import wraps
 
 from flask import Flask, jsonify, render_template, request
@@ -96,6 +97,16 @@ def api_logout():
 
 
 # --------------------------------------------------------------------------- #
+# Warehouse readiness (so the UI can wait out a cold start)
+# --------------------------------------------------------------------------- #
+@app.route("/api/warehouse_status")
+@api
+def warehouse_status():
+    state = data.warehouse_state()
+    return jsonify({"state": state, "ready": state == "RUNNING"})
+
+
+# --------------------------------------------------------------------------- #
 # Data API
 # --------------------------------------------------------------------------- #
 @app.route("/get_count")
@@ -166,6 +177,24 @@ def reload_cache():
 @app.route("/healthz")
 def healthz():
     return {"status": "ok", "mock": data.use_mock()}
+
+
+def _start_warehouse_warmup():
+    """Kick off the (possibly ~10 min) warehouse start in the background at boot,
+    so the cold start overlaps app startup instead of a user's first request."""
+
+    def _warm():
+        try:
+            data.ensure_warehouse_running(block=True)
+        except Exception:  # noqa: BLE001
+            app.logger.exception("Warehouse warm-up failed")
+
+    threading.Thread(target=_warm, name="warehouse-warmup", daemon=True).start()
+
+
+# Runs once per worker process on import (covers both gunicorn and local dev).
+if not data.use_mock() and os.environ.get("AUTO_START_WAREHOUSE", "1") == "1":
+    _start_warehouse_warmup()
 
 
 if __name__ == "__main__":

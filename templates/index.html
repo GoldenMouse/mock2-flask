@@ -85,6 +85,21 @@
       transform: translateY(-2px);
     }
 
+    /* Warehouse warming-up banner */
+    .warehouse-banner {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffe69c;
+      padding: 14px 20px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 600;
+    }
+
     .header {
       background: white;
       padding: 30px;
@@ -619,6 +634,12 @@
 
 <body>
   <div class="container">
+    <!-- Warehouse warming-up banner (shown until the SQL warehouse is RUNNING) -->
+    <div id="warehouseBanner" class="warehouse-banner" style="display: none;">
+      <i class="fas fa-spinner fa-spin"></i>
+      <span id="warehouseBannerText">Starting SQL warehouse…</span>
+    </div>
+
     <!-- NEW: User Header Bar -->
     <div class="user-header">
       <div class="user-info">
@@ -877,6 +898,7 @@
     let currentData = [];
     let searchTimeout = null;
     let currentUser = null; // NEW: Store current user
+    let warehouseReady = false; // NEW: true once the SQL warehouse is RUNNING
 
     // NEW: Check authentication on page load
     window.onload = function () {
@@ -897,8 +919,7 @@
           if (user && !user.error) {
             currentUser = user;
             displayUserInfo(user);
-            loadCount();
-            document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-search"></i><br>Enter a search term to find entries<br><small>Or click "Show All" to see recent entries (limited to 100)</small></div>';
+            waitForWarehouse();
           } else {
             window.location.href = '/login';
           }
@@ -931,6 +952,46 @@
       }
     }
 
+    function showDefaultResults() {
+      document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-search"></i><br>Enter a search term to find entries<br><small>Or click "Show All" to see recent entries (limited to 100)</small></div>';
+    }
+
+    // Poll warehouse status; hold data actions until the warehouse is RUNNING.
+    function waitForWarehouse() {
+      fetch('/api/warehouse_status')
+        .then(r => r.json())
+        .then(s => {
+          if (s && s.ready) {
+            warehouseReady = true;
+            document.getElementById('warehouseBanner').style.display = 'none';
+            loadCount();
+            showDefaultResults();
+          } else {
+            warehouseReady = false;
+            const state = (s && s.state) ? ' (' + s.state + ')' : '';
+            document.getElementById('warehouseBannerText').textContent =
+              'Starting SQL warehouse' + state + '… the first load can take up to ~10 minutes. This page updates automatically.';
+            document.getElementById('warehouseBanner').style.display = 'flex';
+            document.getElementById('results').innerHTML =
+              '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Waiting for the SQL warehouse to start…</div>';
+            setTimeout(waitForWarehouse, 5000);
+          }
+        })
+        .catch(err => {
+          console.error('Warehouse status check failed:', err);
+          setTimeout(waitForWarehouse, 8000);
+        });
+    }
+
+    // Guard for data actions: show a friendly message instead of connection errors.
+    function requireWarehouse() {
+      if (!warehouseReady) {
+        showStatus('⏳ SQL warehouse is still starting — please wait…', 'error');
+        return false;
+      }
+      return true;
+    }
+
     function loadCount() {
       fetch('/get_count')
         .then(r => {
@@ -955,6 +1016,7 @@
     }
 
     function loadAll() {
+      if (!requireWarehouse()) return;
       document.getElementById('searchBox').value = '';
       showLoading();
       const showInactive = document.getElementById('showInactive').checked;
@@ -998,6 +1060,7 @@
     }
 
     function search() {
+      if (!requireWarehouse()) return;
       const query = document.getElementById('searchBox').value.trim();
       const showInactive = document.getElementById('showInactive').checked;
 
@@ -1040,6 +1103,7 @@
     }
 
     function addEntry() {
+      if (!requireWarehouse()) return;
       const entry = {
         // userID removed - auto-filled by backend from session
         category: document.getElementById('category').value,
@@ -1225,6 +1289,7 @@
     }
 
     function saveEdit() {
+      if (!requireWarehouse()) return;
       if (!currentEditingID) {
         showStatus('❌ No entry selected', 'error');
         return;
@@ -1333,6 +1398,7 @@
     });
 
     function toggleActive(entryID) {
+      if (!requireWarehouse()) return;
       fetch('/toggle_active', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1362,6 +1428,7 @@
     }
 
     function deleteRow(entryID) {
+      if (!requireWarehouse()) return;
       if (!confirm('Are you sure you want to delete this entry?')) return;
 
       fetch('/delete', {
@@ -1394,6 +1461,7 @@
     }
 
     function reloadFromDatabricks() {
+      if (!requireWarehouse()) return;
       fetch('/reload_cache', { method: 'POST' })
         .then(r => {
           if (r.status === 401) {

@@ -13,7 +13,13 @@ string so the frontend's strict `===` comparisons work regardless of backend.
 """
 
 import datetime
+import logging
 import os
+import re
+import threading
+import time
+
+log = logging.getLogger(__name__)
 
 
 def _ident(part):
@@ -99,16 +105,140 @@ def _serialize(row):
 # --------------------------------------------------------------------------- #
 # Databricks backend
 # --------------------------------------------------------------------------- #
+_warehouse_ready = False
+_start_issued = False
+_warehouse_lock = threading.Lock()
+
+
+def _warehouse_id():
+    """Extract the warehouse id from the configured HTTP path."""
+    match = re.search(r"/warehouses/([^/?]+)", os.environ.get("DATABRICKS_HTTP_PATH", ""))
+    return match.group(1) if match else None
+
+
+def _auto_start_enabled():
+    return os.environ.get("AUTO_START_WAREHOUSE", "1") == "1"
+
+
+def _warehouse_client():
+    from databricks.sdk import WorkspaceClient
+
+    return WorkspaceClient()
+
+
+def _read_state(client, warehouse_id):
+    state = client.warehouses.get(warehouse_id).state
+    return state.value if state is not None else None
+
+
+def warehouse_state():
+    """Fast, non-blocking lookup of the warehouse state, for the status endpoint.
+
+    Returns 'RUNNING' whenever there is nothing to wait for (mock mode,
+    auto-start disabled, or no warehouse id). Returns None if it can't be read.
+    """
+    if use_mock() or not _auto_start_enabled():
+        return "RUNNING"
+    warehouse_id = _warehouse_id()
+    if not warehouse_id:
+        return "RUNNING"
+    if _warehouse_ready:
+        return "RUNNING"
+    try:
+        return _read_state(_warehouse_client(), warehouse_id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Could not read warehouse state: %s", exc)
+        return None
+
+
+def ensure_warehouse_running(block=True):
+    """Ensure the SQL warehouse is starting / running.
+
+    Starts the warehouse if it's stopped. Controlled by env vars:
+      AUTO_START_WAREHOUSE    ("1" default; set "0" to disable)
+      WAREHOUSE_START_TIMEOUT (seconds to wait when blocking, default 900)
+
+    With ``block=True`` (used by the boot-time warm-up thread) it waits until
+    RUNNING. With ``block=False`` (used on the request path) it only makes sure
+    a start has been triggered and returns immediately, leaving the connect
+    retry loop to ride out the rest of the cold-start window. A cold classic
+    warehouse can take ~10 minutes, which is why the wait lives in a background
+    thread rather than a request.
+    """
+    global _warehouse_ready, _start_issued
+    if _warehouse_ready:
+        return
+    if use_mock() or not _auto_start_enabled():
+        _warehouse_ready = True
+        return
+    warehouse_id = _warehouse_id()
+    if not warehouse_id:
+        _warehouse_ready = True
+        return
+
+    client = _warehouse_client()
+    if _read_state(client, warehouse_id) == "RUNNING":
+        _warehouse_ready = True
+        return
+
+    with _warehouse_lock:
+        if not _start_issued:
+            _start_issued = True
+            log.warning(
+                "SQL warehouse %s is not running — starting it "
+                "(a cold start can take ~10 minutes)...", warehouse_id,
+            )
+            try:
+                client.warehouses.start(warehouse_id)
+            except Exception as exc:  # noqa: BLE001 - permission/transient
+                log.warning("Could not issue warehouse start (%s).", exc)
+
+    if not block:
+        return
+
+    timeout = int(os.environ.get("WAREHOUSE_START_TIMEOUT", "900"))
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _read_state(client, warehouse_id) == "RUNNING":
+            _warehouse_ready = True
+            log.warning("SQL warehouse %s is RUNNING.", warehouse_id)
+            return
+        time.sleep(10)
+    log.warning(
+        "SQL warehouse %s still not RUNNING after %ss; proceeding anyway.",
+        warehouse_id, timeout,
+    )
+
+
 def _get_connection():
     from databricks import sql
     from databricks.sdk.core import Config
 
+    # Non-blocking on the request path: the boot-time warm-up thread does the
+    # long wait; here we just ensure a start was triggered, then retry-connect.
+    ensure_warehouse_running(block=False)
+
     cfg = Config()
-    return sql.connect(
-        server_hostname=cfg.host,
-        http_path=os.environ["DATABRICKS_HTTP_PATH"],
-        credentials_provider=lambda: cfg.authenticate,
-    )
+    http_path = os.environ["DATABRICKS_HTTP_PATH"]
+    attempts = int(os.environ.get("CONNECT_RETRIES", "4"))
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            return sql.connect(
+                server_hostname=cfg.host,
+                http_path=http_path,
+                credentials_provider=lambda: cfg.authenticate,
+            )
+        except Exception as exc:  # noqa: BLE001 - retry transient cold-start resets
+            last_error = exc
+            wait = 2 * (2 ** attempt)  # 2s, 4s, 8s, ...
+            log.warning(
+                "Warehouse connect attempt %d/%d failed (%s); retrying in %ss.",
+                attempt + 1, attempts, exc, wait,
+            )
+            if attempt < attempts - 1:
+                time.sleep(wait)
+    raise last_error
 
 
 def _query(statement, params=None, fetch=True):
