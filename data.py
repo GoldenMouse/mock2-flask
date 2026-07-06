@@ -1,4 +1,4 @@
-"""Data-access layer for the MarketArm app.
+"""Data-access layer for the MarketArm / Entity Manager app.
 
 Two interchangeable backends behind the same functions:
 
@@ -7,11 +7,12 @@ Two interchangeable backends behind the same functions:
 * **Mock** — an in-memory list seeded with sample rows. Used automatically for
   local development when no warehouse is configured, or when `USE_MOCK=1`.
 
-The Flask app only calls the module-level functions (`list_entries`,
-`get_entry`, `create_entry`, `update_entry`, `delete_entry`) and never needs to
-know which backend is active.
+The Flask app only calls the module-level functions and never needs to know
+which backend is active. Rows are returned with `entryID` serialized as a
+string so the frontend's strict `===` comparisons work regardless of backend.
 """
 
+import datetime
 import os
 
 TABLE = "spark_catalog.marketarm.tblentry"
@@ -32,12 +33,54 @@ FIELDS = [
     "Active",
 ]
 
+# Columns a free-text search scans.
+SEARCH_COLS = [
+    "entryID",
+    "category",
+    "nameEntry",
+    "citizen",
+    "alias",
+    "alias2",
+    "alias3",
+    "URL",
+    "PriorWCDJ",
+    "userID",
+    "Description",
+]
+
 
 def use_mock():
     """Mock mode when explicitly requested or when no warehouse is configured."""
     if os.environ.get("USE_MOCK") == "1":
         return True
     return not os.environ.get("DATABRICKS_HTTP_PATH")
+
+
+def coerce(payload, default_user_id=None):
+    """Normalize an incoming JSON entry into a column->value dict."""
+    values = {}
+    for field in FIELDS:
+        raw = payload.get(field)
+        if field == "Active":
+            values[field] = bool(raw)
+        elif isinstance(raw, str):
+            values[field] = raw.strip() or None
+        else:
+            values[field] = raw if raw not in ("", None) else None
+    if default_user_id is not None and not values.get("userID"):
+        values["userID"] = default_user_id
+    return values
+
+
+def _serialize(row):
+    """Normalize a row for the frontend: entryID as string, dates as YYYY-MM-DD."""
+    row = dict(row)
+    if row.get("entryID") is not None:
+        row["entryID"] = str(row["entryID"])
+    for key, value in row.items():
+        if isinstance(value, (datetime.date, datetime.datetime)):
+            row[key] = value.strftime("%Y-%m-%d")
+    return row
 
 
 # --------------------------------------------------------------------------- #
@@ -65,13 +108,32 @@ def _query(statement, params=None, fetch=True):
             return [dict(zip(columns, row)) for row in cur.fetchall()]
 
 
-def _db_list():
-    return _query(f"SELECT * FROM {TABLE} ORDER BY entryID DESC")
+def _db_search(q, show_inactive, limit):
+    where, params = [], {}
+    if not show_inactive:
+        where.append("Active = true")
+    if q:
+        params["q"] = f"%{q}%"
+        cols = [
+            f"CAST({c} AS STRING) LIKE %(q)s" if c == "entryID" else f"{c} LIKE %(q)s"
+            for c in SEARCH_COLS
+        ]
+        where.append("(" + " OR ".join(cols) + ")")
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
+    rows = _query(
+        f"SELECT * FROM {TABLE} {clause} ORDER BY entryID DESC LIMIT {int(limit)}",
+        params,
+    )
+    return [_serialize(r) for r in rows]
 
 
 def _db_get(entry_id):
     rows = _query(f"SELECT * FROM {TABLE} WHERE entryID = %(id)s", {"id": entry_id})
     return rows[0] if rows else None
+
+
+def _db_count():
+    return _query(f"SELECT COUNT(*) AS c FROM {TABLE}")[0]["c"]
 
 
 def _db_create(values):
@@ -84,6 +146,7 @@ def _db_create(values):
         row,
         fetch=False,
     )
+    return next_id
 
 
 def _db_update(entry_id, values):
@@ -100,6 +163,19 @@ def _db_delete(entry_id):
     _query(f"DELETE FROM {TABLE} WHERE entryID = %(id)s", {"id": entry_id}, fetch=False)
 
 
+def _db_toggle(entry_id):
+    current = _db_get(entry_id)
+    if current is None:
+        raise ValueError(f"Entry {entry_id} not found")
+    new_value = not current.get("Active")
+    _query(
+        f"UPDATE {TABLE} SET Active = %(a)s WHERE entryID = %(id)s",
+        {"a": new_value, "id": entry_id},
+        fetch=False,
+    )
+    return new_value
+
+
 # --------------------------------------------------------------------------- #
 # Mock backend (in-memory, seeded)
 # --------------------------------------------------------------------------- #
@@ -114,7 +190,7 @@ _MOCK_ROWS = [
         "alias3": None,
         "URL": "https://example.gov/sanctions/1001",
         "PriorWCDJ": "2023-11-04",
-        "LastWCDJ": "2024-06-12 09:30:00",
+        "LastWCDJ": "2024-06-12",
         "userID": "analyst01",
         "Description": "Listed for procurement network activity.",
         "Active": True,
@@ -129,7 +205,7 @@ _MOCK_ROWS = [
         "alias3": None,
         "URL": "https://example.gov/sanctions/1002",
         "PriorWCDJ": None,
-        "LastWCDJ": "2024-02-01 14:15:00",
+        "LastWCDJ": "2024-02-01",
         "userID": "analyst02",
         "Description": "Front company; shipping intermediary.",
         "Active": True,
@@ -144,7 +220,7 @@ _MOCK_ROWS = [
         "alias3": None,
         "URL": None,
         "PriorWCDJ": "2022-08-19",
-        "LastWCDJ": "2023-12-20 00:00:00",
+        "LastWCDJ": "2023-12-20",
         "userID": "analyst01",
         "Description": "Delisted after review.",
         "Active": False,
@@ -153,19 +229,38 @@ _MOCK_ROWS = [
 
 
 def _mock_next_id():
-    return (max((r["entryID"] for r in _MOCK_ROWS), default=0)) + 1
-
-
-def _mock_list():
-    return sorted(_MOCK_ROWS, key=lambda r: r["entryID"], reverse=True)
+    return max((r["entryID"] for r in _MOCK_ROWS), default=0) + 1
 
 
 def _mock_get(entry_id):
     return next((r for r in _MOCK_ROWS if r["entryID"] == entry_id), None)
 
 
+def _mock_search(q, show_inactive, limit):
+    rows = sorted(_MOCK_ROWS, key=lambda r: r["entryID"], reverse=True)
+    if not show_inactive:
+        rows = [r for r in rows if r.get("Active")]
+    if q:
+        ql = q.lower()
+        rows = [
+            r
+            for r in rows
+            if any(
+                r.get(c) is not None and ql in str(r.get(c)).lower()
+                for c in SEARCH_COLS
+            )
+        ]
+    return [_serialize(r) for r in rows[:limit]]
+
+
+def _mock_count():
+    return len(_MOCK_ROWS)
+
+
 def _mock_create(values):
-    _MOCK_ROWS.append({**values, "entryID": _mock_next_id()})
+    new_id = _mock_next_id()
+    _MOCK_ROWS.append({**values, "entryID": new_id})
+    return new_id
 
 
 def _mock_update(entry_id, values):
@@ -180,11 +275,23 @@ def _mock_delete(entry_id):
     _MOCK_ROWS = [r for r in _MOCK_ROWS if r["entryID"] != entry_id]
 
 
+def _mock_toggle(entry_id):
+    row = _mock_get(entry_id)
+    if row is None:
+        raise ValueError(f"Entry {entry_id} not found")
+    row["Active"] = not row.get("Active")
+    return row["Active"]
+
+
 # --------------------------------------------------------------------------- #
 # Public dispatch
 # --------------------------------------------------------------------------- #
-def list_entries():
-    return _mock_list() if use_mock() else _db_list()
+def search_entries(q, show_inactive, limit):
+    return _mock_search(q, show_inactive, limit) if use_mock() else _db_search(q, show_inactive, limit)
+
+
+def count_entries():
+    return _mock_count() if use_mock() else _db_count()
 
 
 def get_entry(entry_id):
@@ -192,7 +299,7 @@ def get_entry(entry_id):
 
 
 def create_entry(values):
-    return _mock_create(values) if use_mock() else _db_create(values)
+    return str(_mock_create(values) if use_mock() else _db_create(values))
 
 
 def update_entry(entry_id, values):
@@ -201,3 +308,7 @@ def update_entry(entry_id, values):
 
 def delete_entry(entry_id):
     return _mock_delete(entry_id) if use_mock() else _db_delete(entry_id)
+
+
+def toggle_active(entry_id):
+    return _mock_toggle(entry_id) if use_mock() else _db_toggle(entry_id)
