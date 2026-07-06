@@ -1,205 +1,1417 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MarketArm — Entries</title>
+  <title>Entity Manager</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #1e293b;
-      --panel-2: #273449;
-      --border: #334155;
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-2: #0ea5e9;
-      --danger: #f87171;
-      --ok: #4ade80;
-    }
-    * { box-sizing: border-box; }
-    body {
+    * {
       margin: 0;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
+      padding: 0;
+      box-sizing: border-box;
     }
-    header {
-      padding: 20px 28px;
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* NEW: User header bar */
+    .user-header {
+      background: white;
+      padding: 15px 30px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
       display: flex;
-      align-items: baseline;
-      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
     }
-    header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
-    header .sub { color: var(--muted); font-size: 13px; }
-    main { max-width: 1200px; margin: 0 auto; padding: 24px 28px 60px; }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.2em;
+    }
+
+    .user-details {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .user-role {
+      font-size: 0.85em;
+      color: #666;
+    }
+
+    .btn-logout {
+      padding: 8px 20px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+
+    .btn-logout:hover {
+      background: #c82333;
+      transform: translateY(-2px);
+    }
+
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .header h1 {
+      color: #667eea;
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 1.1em;
+    }
+
     .card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 22px;
-      margin-bottom: 28px;
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      margin-bottom: 25px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
     }
-    .card h2 { margin: 0 0 16px; font-size: 16px; }
-    form.entry-form {
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .card h3 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 14px 18px;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
     }
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
-    .field input[type="text"],
-    .field input[type="datetime-local"],
-    .field textarea {
-      background: var(--panel-2);
-      border: 1px solid var(--border);
-      color: var(--text);
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    label {
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 5px;
+      font-size: 0.9em;
+    }
+
+    input[type="text"],
+    input[type="date"],
+    select,
+    textarea {
+      padding: 12px;
+      border: 2px solid #e0e0e0;
       border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 14px;
+      font-size: 1em;
+      transition: border-color 0.3s, box-shadow 0.3s;
       font-family: inherit;
     }
-    .field input:focus, .field textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
-    .field.checkbox { flex-direction: row; align-items: center; gap: 8px; }
-    .field.checkbox label { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
-    .form-actions { grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 4px; }
-    button {
+
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 15px 0;
+    }
+
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
       cursor: pointer;
+    }
+
+    .btn {
+      padding: 12px 30px;
       border: none;
       border-radius: 8px;
-      padding: 9px 16px;
-      font-size: 14px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+
+    .btn-warning {
+      background: #ffc107;
+      color: #333;
+    }
+
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .btn-info {
+      background: #17a2b8;
+      color: white;
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .search-bar input {
+      flex: 1;
+      min-width: 300px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .stat-badge {
+      background: #f0f0f0;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #f0f0f0;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    tr:hover {
+      background: #f8f9ff;
+    }
+
+    .inactive-row {
+      background: #ffe6e6;
+    }
+
+    .inactive-row:hover {
+      background: #fdd;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 0.85em;
+    }
+
+    .status-message {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 8px;
+      background: #28a745;
+      color: white;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      z-index: 1000;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .status-error {
+      background: #dc3545;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-size: 1.2em;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #667eea;
+      font-size: 1.2em;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.85em;
       font-weight: 600;
     }
-    .btn-primary { background: var(--accent-2); color: #041016; }
-    .btn-primary:hover { background: var(--accent); }
-    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-    .btn-ghost:hover { color: var(--text); }
-    .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--border); }
-    .btn-danger:hover { background: var(--danger); color: #1a0505; }
-    .btn-sm { padding: 5px 10px; font-size: 12px; }
-    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 10px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-    th { background: var(--panel-2); color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(56,189,248,.05); }
-    td.actions { display: flex; gap: 8px; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-    .pill.on { background: rgba(74,222,128,.15); color: var(--ok); }
-    .pill.off { background: rgba(148,163,184,.15); color: var(--muted); }
-    .empty { padding: 40px; text-align: center; color: var(--muted); }
-    .desc-cell { max-width: 280px; white-space: normal; }
-    .badge-mock {
-      margin-left: auto;
-      background: rgba(250,204,21,.15);
-      color: #facc15;
-      border: 1px solid rgba(250,204,21,.4);
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .5px;
+
+    .badge-active {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge-inactive {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    /* ===================================
+        MODAL STYLES - NEW!
+        =================================== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    .modal {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 800px;
+      width: 90%;
+      max-height: 90vh;
+      overflow: hidden;
+      animation: slideUp 0.3s ease-out;
+      display: flex;
+      flex-direction: column;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(50px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 1.5em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-close {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      font-size: 1.5em;
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: rotate(90deg);
+    }
+
+    .modal-body {
+      padding: 30px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 20px 30px;
+      background: #f8f9fa;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .modal-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .modal-form-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .modal-form-group label {
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 8px;
+      font-size: 0.95em;
+    }
+
+    .modal-form-group label .required {
+      color: #dc3545;
+      margin-left: 3px;
+    }
+
+    .modal-form-group input,
+    .modal-form-group select,
+    .modal-form-group textarea {
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1em;
+      transition: all 0.3s;
+      font-family: inherit;
+    }
+
+    .modal-form-group input:focus,
+    .modal-form-group select:focus,
+    .modal-form-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .modal-form-group textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .modal-checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .modal-checkbox-group input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+      cursor: pointer;
+    }
+
+    .modal-checkbox-group label {
+      margin: 0;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 1.8em;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .search-bar {
+        flex-direction: column;
+      }
+
+      .search-bar input {
+        width: 100%;
+      }
+
+      .stats {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .user-header {
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      /* Modal responsive - NEW */
+      .modal {
+        width: 95%;
+        max-height: 95vh;
+      }
+
+      .modal-form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-body {
+        padding: 20px;
+      }
+
+      .modal-footer {
+        padding: 15px 20px;
+        flex-direction: column-reverse;
+      }
+
+      .modal-footer .btn {
+        width: 100%;
+        justify-content: center;
+      }
     }
   </style>
 </head>
+
 <body>
-  <header>
-    <h1>MarketArm</h1>
-    <span class="sub">spark_catalog.marketarm.tblentry · {{ entries|length }} entries · {{ now }} UTC</span>
-    {% if mock %}<span class="badge-mock">MOCK DATA</span>{% endif %}
-  </header>
-
-  <main>
-    <!-- Create / Edit form -->
-    <section class="card">
-      <h2>{{ "Edit entry #" ~ editing.entryID if editing else "New entry" }}</h2>
-      <form class="entry-form" method="post" action="{{ url_for('index') }}">
-        <input type="hidden" name="action" value="{{ 'update' if editing else 'create' }}">
-        {% if editing %}
-        <input type="hidden" name="entryID" value="{{ editing.entryID }}">
-        {% endif %}
-
-        {% for f in fields %}
-          {% if f == 'Active' %}
-            <div class="field checkbox">
-              <input type="checkbox" id="{{ f }}" name="Active" {{ 'checked' if editing and editing.Active else '' }}>
-              <label for="{{ f }}">Active</label>
-            </div>
-          {% elif f == 'Description' %}
-            <div class="field" style="grid-column: 1 / -1;">
-              <label for="{{ f }}">{{ f }}</label>
-              <textarea id="{{ f }}" name="{{ f }}" rows="2">{{ editing[f] if editing and editing[f] is not none else '' }}</textarea>
-            </div>
-          {% elif f == 'LastWCDJ' %}
-            <div class="field">
-              <label for="{{ f }}">{{ f }} (YYYY-MM-DD HH:MM:SS)</label>
-              <input type="text" id="{{ f }}" name="{{ f }}" placeholder="2026-07-06 12:00:00"
-                     value="{{ editing[f] if editing and editing[f] is not none else '' }}">
-            </div>
-          {% else %}
-            <div class="field">
-              <label for="{{ f }}">{{ f }}</label>
-              <input type="text" id="{{ f }}" name="{{ f }}"
-                     value="{{ editing[f] if editing and editing[f] is not none else '' }}">
-            </div>
-          {% endif %}
-        {% endfor %}
-
-        <div class="form-actions">
-          <button type="submit" class="btn-primary">{{ "Save changes" if editing else "Create entry" }}</button>
-          {% if editing %}
-          <a href="{{ url_for('index') }}"><button type="button" class="btn-ghost">Cancel</button></a>
-          {% endif %}
+  <div class="container">
+    <!-- NEW: User Header Bar -->
+    <div class="user-header">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div class="user-details">
+          <div class="user-name" id="userName">Loading...</div>
+          <div class="user-role" id="userRole">Loading...</div>
         </div>
-      </form>
-    </section>
-
-    <!-- List -->
-    <section>
-      <div class="table-wrap">
-        {% if entries %}
-        <table>
-          <thead>
-            <tr>
-              <th>entryID</th>
-              {% for f in fields %}<th>{{ f }}</th>{% endfor %}
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for e in entries %}
-            <tr>
-              <td>{{ e.entryID }}</td>
-              {% for f in fields %}
-                {% if f == 'Active' %}
-                  <td><span class="pill {{ 'on' if e.Active else 'off' }}">{{ 'Active' if e.Active else 'Inactive' }}</span></td>
-                {% elif f == 'Description' %}
-                  <td class="desc-cell">{{ e[f] if e[f] is not none else '' }}</td>
-                {% else %}
-                  <td>{{ e[f] if e[f] is not none else '' }}</td>
-                {% endif %}
-              {% endfor %}
-              <td class="actions">
-                <a href="{{ url_for('index', edit=e.entryID) }}"><button type="button" class="btn-ghost btn-sm">Edit</button></a>
-                <form method="post" action="{{ url_for('index') }}" onsubmit="return confirm('Delete entry #{{ e.entryID }}?');">
-                  <input type="hidden" name="action" value="delete">
-                  <input type="hidden" name="entryID" value="{{ e.entryID }}">
-                  <button type="submit" class="btn-danger btn-sm">Delete</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <div class="empty">No entries yet. Use the form above to create the first one.</div>
-        {% endif %}
       </div>
-    </section>
-  </main>
+      <button class="btn-logout" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </button>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <h1><i class="fas fa-database"></i> Entity Management System</h1>
+      <p>Powered by Databricks • Real-time Data Management</p>
+    </div>
+
+    <!-- Add New Entry Card -->
+    <div class="card">
+      <h3><i class="fas fa-plus-circle"></i> Add New Entry</h3>
+      <div class="form-grid">
+        <!-- REMOVED: userID field (auto-filled from session) -->
+        <div class="form-group">
+          <label for="category">Category</label>
+          <select id="category">
+            <option value="Individual">Individual</option>
+            <option value="Vessel">Vessel</option>
+            <option value="Entity">Entity</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="nameEntry">Name <span style="color:red;">*</span></label>
+          <input type="text" id="nameEntry" placeholder="Enter name (required)">
+        </div>
+        <div class="form-group">
+          <label for="citizen">Citizen</label>
+          <input type="text" id="citizen" placeholder="Enter citizenship">
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="alias">Alias 1</label>
+          <input type="text" id="alias" placeholder="Enter alias">
+        </div>
+        <div class="form-group">
+          <label for="alias2">Alias 2</label>
+          <input type="text" id="alias2" placeholder="Enter alias">
+        </div>
+        <div class="form-group">
+          <label for="alias3">Alias 3</label>
+          <input type="text" id="alias3" placeholder="Enter alias">
+        </div>
+        <div class="form-group">
+          <label for="url">URL</label>
+          <input type="text" id="url" placeholder="Enter URL">
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="priorWCDJ">Prior WCDJ</label>
+          <input type="text" id="priorWCDJ" placeholder="Enter prior WCDJ">
+        </div>
+        <div class="form-group">
+          <label for="lastWCDJ">Last WCDJ</label>
+          <input type="date" id="lastWCDJ">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" placeholder="Enter description"></textarea>
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="active" checked>
+        <label for="active" style="margin: 0;">Active</label>
+      </div>
+
+      <button class="btn btn-primary" onclick="addEntry()">
+        <i class="fas fa-plus"></i> Add Entry
+      </button>
+    </div>
+    <!-- Search Card -->
+    <div class="card">
+      <h3><i class="fas fa-search"></i> Search & Filter</h3>
+      <div class="search-bar">
+        <input type="text" id="searchBox" placeholder="Search by name, alias, ID, or any field...">
+        <button class="btn btn-primary" onclick="search()">
+          <i class="fas fa-search"></i> Search
+        </button>
+        <button class="btn btn-secondary" onclick="loadAll()">
+          <i class="fas fa-list"></i> Show All
+        </button>
+        <button class="btn btn-info" onclick="reloadFromDatabricks()">
+          <i class="fas fa-sync-alt"></i> Reload
+        </button>
+        <div class="checkbox-group" style="margin: 0;">
+          <input type="checkbox" id="showInactive" onchange="loadAll()
+                    <input type=" checkbox" id="showInactive" onchange="loadAll()">
+          <label for="showInactive" style="margin: 0;">Show Inactive</label>
+        </div>
+        <div class="stats">
+          <div class="stat-badge">
+            <i class="fas fa-database"></i> Total: <strong id="totalCount">0</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Card -->
+    <div class="card">
+      <h3><i class="fas fa-table"></i> Results</h3>
+      <div id="results" class="table-container"></div>
+    </div>
+  </div>
+  </div> <!-- closing container div -->
+
+  <!-- ===================================
+         EDIT MODAL - NEW!
+         =================================== -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>
+          <i class="fas fa-edit"></i>
+          Edit Entry
+        </h2>
+        <button class="modal-close" onclick="closeEditModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-form-grid">
+          <!-- Entry ID (read-only) -->
+          <div class="modal-form-group">
+            <label>Entry ID</label>
+            <input type="text" id="edit_entryID" readonly style="background: #f0f0f0;">
+          </div>
+
+          <!-- User ID (read-only) -->
+          <div class="modal-form-group">
+            <label>User ID</label>
+            <input type="text" id="edit_userID" readonly style="background: #f0f0f0;">
+          </div>
+
+          <!-- Category -->
+          <div class="modal-form-group">
+            <label>Category</label>
+            <select id="edit_category">
+              <option value="Individual">Individual</option>
+              <option value="Vessel">Vessel</option>
+              <option value="Entity">Entity</option>
+            </select>
+          </div>
+
+          <!-- Name Entry (required) -->
+          <div class="modal-form-group">
+            <label>Name <span class="required">*</span></label>
+            <input type="text" id="edit_nameEntry" placeholder="Enter name (required)">
+          </div>
+
+          <!-- Citizen -->
+          <div class="modal-form-group">
+            <label>Citizen</label>
+            <input type="text" id="edit_citizen" placeholder="Enter citizenship">
+          </div>
+
+          <!-- Alias 1 -->
+          <div class="modal-form-group">
+            <label>Alias 1</label>
+            <input type="text" id="edit_alias" placeholder="Enter alias">
+          </div>
+
+          <!-- Alias 2 -->
+          <div class="modal-form-group">
+            <label>Alias 2</label>
+            <input type="text" id="edit_alias2" placeholder="Enter alias">
+          </div>
+
+          <!-- Alias 3 -->
+          <div class="modal-form-group">
+            <label>Alias 3</label>
+            <input type="text" id="edit_alias3" placeholder="Enter alias">
+          </div>
+
+          <!-- URL -->
+          <div class="modal-form-group full-width">
+            <label>URL</label>
+            <input type="text" id="edit_URL" placeholder="Enter URL">
+          </div>
+
+          <!-- Prior WCDJ -->
+          <div class="modal-form-group">
+            <label>Prior WCDJ</label>
+            <input type="text" id="edit_PriorWCDJ" placeholder="Enter prior WCDJ">
+          </div>
+
+          <!-- Last WCDJ -->
+          <div class="modal-form-group">
+            <label>Last WCDJ</label>
+            <input type="date" id="edit_LastWCDJ">
+          </div>
+
+          <!-- Description (full width) -->
+          <div class="modal-form-group full-width">
+            <label>Description</label>
+            <textarea id="edit_Description" placeholder="Enter description"></textarea>
+          </div>
+        </div>
+
+        <!-- Active Checkbox -->
+        <div class="modal-checkbox-group">
+          <input type="checkbox" id="edit_Active">
+          <label for="edit_Active">Active</label>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeEditModal()">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+        <button class="btn btn-success" onclick="saveEdit()" id="saveEditBtn">
+          <i class="fas fa-save"></i> Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <script>
+    const columns = ['entryID', 'userID', 'category', 'nameEntry', 'citizen', 'alias', 'alias2', 'alias3', 'URL', 'PriorWCDJ', 'LastWCDJ', 'Description', 'Active'];
+    let currentData = [];
+    let searchTimeout = null;
+    let currentUser = null; // NEW: Store current user
+
+    // NEW: Check authentication on page load
+    window.onload = function () {
+      checkAuth();
+    };
+
+    // NEW: Check if user is logged in
+    function checkAuth() {
+      fetch('/api/current_user')
+        .then(r => {
+          if (!r.ok) {
+            window.location.href = '/login';
+            return;
+          }
+          return r.json();
+        })
+        .then(user => {
+          if (user && !user.error) {
+            currentUser = user;
+            displayUserInfo(user);
+            loadCount();
+            document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-search"></i><br>Enter a search term to find entries<br><small>Or click "Show All" to see recent entries (limited to 100)</small></div>';
+          } else {
+            window.location.href = '/login';
+          }
+        })
+        .catch(err => {
+          console.error('Auth check failed:', err);
+          window.location.href = '/login';
+        });
+    }
+
+    // NEW: Display user info in header
+    function displayUserInfo(user) {
+      const initials = (user.userFirst?.charAt(0) || '') + (user.userLast?.charAt(0) || '');
+      document.getElementById('userAvatar').textContent = initials || '?';
+      document.getElementById('userName').textContent = `${user.userFirst || ''} ${user.userLast || ''}`.trim() || user.userName;
+      document.getElementById('userRole').textContent = `Access Level: ${user.accessLevel || 'User'} • ID: ${user.userID}`;
+    }
+
+    // NEW: Logout function
+    function logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        fetch('/api/logout', { method: 'POST' })
+          .then(() => {
+            window.location.href = '/login';
+          })
+          .catch(err => {
+            console.error('Logout error:', err);
+            window.location.href = '/login';
+          });
+      }
+    }
+
+    function loadCount() {
+      fetch('/get_count')
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (data && data.count !== undefined) {
+            document.getElementById('totalCount').textContent = data.count || 0;
+          }
+        })
+        .catch(err => {
+          console.error('Error loading count:', err);
+        });
+    }
+
+    function showLoading() {
+      document.getElementById('results').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    }
+
+    function loadAll() {
+      document.getElementById('searchBox').value = '';
+      showLoading();
+      const showInactive = document.getElementById('showInactive').checked;
+
+      fetch(`/search?q=&showInactive=${showInactive}&limit=100`)
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          if (!r.ok) {
+            throw new Error(`HTTP error! status: ${r.status}`);
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          if (!Array.isArray(data)) {
+            console.error('Data is not an array:', data);
+            if (data.error) {
+              showStatus(`❌ ${data.error}`, 'error');
+            }
+            document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-exclamation-triangle"></i><br>Error loading data</div>';
+            return;
+          }
+          currentData = data;
+          displayResults(data);
+        })
+        .catch(err => {
+          console.error('Error loading data:', err);
+          showStatus('❌ Error loading data: ' + err.message, 'error');
+        });
+    }
+
+    // Debounced search - wait 500ms after user stops typing
+    function debouncedSearch() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        search();
+      }, 500);
+    }
+
+    function search() {
+      const query = document.getElementById('searchBox').value.trim();
+      const showInactive = document.getElementById('showInactive').checked;
+
+      // If empty query, show message
+      if (!query) {
+        document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-search"></i><br>Enter a search term to find entries<br><small>Or click "Show All" to see recent entries (limited to 100)</small></div>';
+        return;
+      }
+
+      showLoading();
+
+      fetch(`/search?q=${encodeURIComponent(query)}&showInactive=${showInactive}&limit=100`)
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          if (!r.ok) {
+            throw new Error(`HTTP error! status: ${r.status}`);
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          if (!Array.isArray(data)) {
+            console.error('Data is not an array:', data);
+            if (data.error) {
+              showStatus(`❌ ${data.error}`, 'error');
+            }
+            document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-exclamation-triangle"></i><br>Error searching</div>';
+            return;
+          }
+          currentData = data;
+          displayResults(data);
+        })
+        .catch(err => {
+          console.error('Error searching:', err);
+          showStatus('❌ Error searching: ' + err.message, 'error');
+        });
+    }
+
+    function addEntry() {
+      const entry = {
+        // userID removed - auto-filled by backend from session
+        category: document.getElementById('category').value,
+        nameEntry: document.getElementById('nameEntry').value,
+        citizen: document.getElementById('citizen').value,
+        alias: document.getElementById('alias').value,
+        alias2: document.getElementById('alias2').value,
+        alias3: document.getElementById('alias3').value,
+        URL: document.getElementById('url').value,
+        PriorWCDJ: document.getElementById('priorWCDJ').value,
+        LastWCDJ: document.getElementById('lastWCDJ').value,
+        Description: document.getElementById('description').value,
+        Active: document.getElementById('active').checked
+      };
+
+      if (!entry.nameEntry) {
+        alert('Name is required!');
+        return;
+      }
+
+      fetch('/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      })
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          if (data.success) {
+            showStatus(`✅ Added: ${entry.nameEntry} (ID: ${data.entryID})`, 'success');
+            clearForm();
+            loadCount();
+            // Optionally refresh search
+            if (document.getElementById('searchBox').value) {
+              search();
+            }
+          } else {
+            showStatus('❌ Error adding entry: ' + (data.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Error adding entry:', err);
+          showStatus('❌ Error adding entry', 'error');
+        });
+    }
+
+    function clearForm() {
+      // userID removed
+      document.getElementById('nameEntry').value = '';
+      document.getElementById('citizen').value = '';
+      document.getElementById('alias').value = '';
+      document.getElementById('alias2').value = '';
+      document.getElementById('alias3').value = '';
+      document.getElementById('url').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('priorWCDJ').value = '';
+      document.getElementById('lastWCDJ').value = '';
+      document.getElementById('active').checked = true;
+    }
+    function displayResults(data) {
+      if (data.length === 0) {
+        document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-inbox"></i><br>No entries found</div>';
+        return;
+      }
+
+      let html = '<table><thead><tr>';
+      columns.forEach(col => html += `<th>${col}</th>`);
+      html += '<th>Actions</th></tr></thead><tbody>';
+
+      data.forEach((entry) => {
+        const rowClass = entry.Active ? '' : 'inactive-row';
+        html += `<tr id="row-${entry.entryID}" class="${rowClass}">`;
+        columns.forEach(col => {
+          let displayValue = entry[col] === null || entry[col] === undefined ? '' : entry[col];
+          if (col === 'Active') {
+            displayValue = entry[col] ?
+              '<span class="badge badge-active">Active</span>' :
+              '<span class="badge badge-inactive">Inactive</span>';
+          }
+          html += `<td class="cell" data-id="${entry.entryID}" data-col="${col}" title="${entry[col]}">${displayValue}</td>`;
+        });
+        html += `<td class="action-buttons">
+                    <button class="btn btn-info btn-small" onclick="editRow('${entry.entryID}')">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-warning btn-small" onclick="toggleActive('${entry.entryID}')">
+                        <i class="fas fa-toggle-on"></i> ${entry.Active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button class="btn btn-danger btn-small" onclick="deleteRow('${entry.entryID}')">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </td></tr>`;
+      });
+
+      html += '</tbody></table>';
+      document.getElementById('results').innerHTML = html;
+    }
+
+    // ===================================
+    // MODAL EDIT FUNCTIONS - NEW!
+    // ===================================
+
+    let currentEditingID = null;
+
+    function editRow(entryID) {
+      // Find the entry data
+      const entryData = currentData.find(e => e.entryID === entryID);
+
+      if (!entryData) {
+        showStatus('❌ Entry not found', 'error');
+        return;
+      }
+
+      // Store the ID we're editing
+      currentEditingID = entryID;
+
+      // Helper function to safely get value (handles null, undefined, empty string)
+      function safeValue(value) {
+        if (value === null || value === undefined || value === 'null' || value === 'None') {
+          return '';
+        }
+        return String(value).trim();
+      }
+
+      // Populate the modal form with EXISTING values
+      document.getElementById('edit_entryID').value = safeValue(entryData.entryID);
+      document.getElementById('edit_userID').value = safeValue(entryData.userID);
+      document.getElementById('edit_category').value = entryData.category || 'Individual';
+      document.getElementById('edit_nameEntry').value = safeValue(entryData.nameEntry);
+      document.getElementById('edit_citizen').value = safeValue(entryData.citizen);
+      document.getElementById('edit_alias').value = safeValue(entryData.alias);
+      document.getElementById('edit_alias2').value = safeValue(entryData.alias2);
+      document.getElementById('edit_alias3').value = safeValue(entryData.alias3);
+      document.getElementById('edit_URL').value = safeValue(entryData.URL);
+      document.getElementById('edit_PriorWCDJ').value = safeValue(entryData.PriorWCDJ);
+
+      // SPECIAL HANDLING FOR DATE FIELD
+      // LastWCDJ is a DATE field - handle it carefully
+      const lastWCDJ = safeValue(entryData.LastWCDJ);
+      if (lastWCDJ && lastWCDJ !== '') {
+        // If date exists, use it
+        // Dates from Databricks might come as 'YYYY-MM-DD' which is perfect for input[type="date"]
+        document.getElementById('edit_LastWCDJ').value = lastWCDJ;
+      } else {
+        // If no date, leave it empty (user can choose to add one)
+        document.getElementById('edit_LastWCDJ').value = '';
+      }
+
+      document.getElementById('edit_Description').value = safeValue(entryData.Description);
+
+      // Handle boolean Active field
+      document.getElementById('edit_Active').checked = Boolean(entryData.Active);
+
+      // Show the modal
+      document.getElementById('editModal').classList.add('active');
+
+      // Focus on the name field
+      setTimeout(() => {
+        document.getElementById('edit_nameEntry').focus();
+      }, 300);
+
+      // Debug log to verify data
+      console.log('Editing Entry:', entryID);
+      console.log('LastWCDJ Value:', entryData.LastWCDJ);
+      console.log('All Entry Data:', entryData);
+    }
+
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('active');
+      currentEditingID = null;
+    }
+
+    function saveEdit() {
+      if (!currentEditingID) {
+        showStatus('❌ No entry selected', 'error');
+        return;
+      }
+
+      // Validate required fields
+      const nameEntry = document.getElementById('edit_nameEntry').value.trim();
+      if (!nameEntry) {
+        showStatus('❌ Name is required!', 'error');
+        document.getElementById('edit_nameEntry').focus();
+        return;
+      }
+
+      // Disable save button to prevent double-submit
+      const saveBtn = document.getElementById('saveEditBtn');
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+      // Helper function to get trimmed value or empty string
+      function getFieldValue(fieldId) {
+        const value = document.getElementById(fieldId).value;
+        return value ? value.trim() : '';
+      }
+
+      // Gather all form data - preserving existing values
+      const updates = {
+        entryID: currentEditingID,
+        userID: getFieldValue('edit_userID'),
+        category: document.getElementById('edit_category').value,
+        nameEntry: nameEntry,
+        citizen: getFieldValue('edit_citizen'),
+        alias: getFieldValue('edit_alias'),
+        alias2: getFieldValue('edit_alias2'),
+        alias3: getFieldValue('edit_alias3'),
+        URL: getFieldValue('edit_URL'),
+        PriorWCDJ: getFieldValue('edit_PriorWCDJ'),
+        LastWCDJ: getFieldValue('edit_LastWCDJ'), // Will be empty string if user cleared it
+        Description: getFieldValue('edit_Description'),
+        Active: document.getElementById('edit_Active').checked
+      };
+
+      console.log('Saving updates:', updates); // Debug log
+
+      // Send update request
+      fetch('/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+
+          // Re-enable button
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+
+          if (data.success) {
+            showStatus(`✅ Changes saved for ${nameEntry}!`, 'success');
+            closeEditModal();
+
+            // Refresh the current search/view
+            const searchBox = document.getElementById('searchBox');
+            if (searchBox.value.trim()) {
+              search();
+            } else {
+              loadAll();
+            }
+          } else {
+            showStatus('❌ Error updating: ' + (data.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Error updating:', err);
+          showStatus('❌ Error updating entry', 'error');
+
+          // Re-enable button
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+        });
+    }
+
+
+    // Close modal when clicking outside of it
+    document.addEventListener('click', function (event) {
+      const modal = document.getElementById('editModal');
+      if (event.target === modal) {
+        closeEditModal();
+      }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        const modal = document.getElementById('editModal');
+        if (modal.classList.contains('active')) {
+          closeEditModal();
+        }
+      }
+    });
+
+    function toggleActive(entryID) {
+      fetch('/toggle_active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryID: entryID })
+      })
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (!data) return;
+          if (data.success) {
+            showStatus(`✅ Entry ${data.active ? 'activated' : 'deactivated'}`, 'success');
+            // Refresh search
+            search();
+          } else {
+            showStatus('❌ Error toggling status: ' + (data.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Error toggling active:', err);
+          showStatus('❌ Error toggling status', 'error');
+        });
+    }
+
+    function deleteRow(entryID) {
+      if (!confirm('Are you sure you want to delete this entry?')) return;
+
+      fetch('/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryID: entryID })
+      })
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          return r.json();
+        })
+        .then((data) => {
+          if (!data) return;
+          if (data.success) {
+            showStatus('✅ Entry deleted', 'success');
+            loadCount();
+            // Refresh search
+            search();
+          } else {
+            showStatus('❌ Error deleting: ' + (data.error || 'Unknown error'), 'error');
+          }
+        })
+        .catch(err => {
+          console.error('Error deleting:', err);
+          showStatus('❌ Error deleting', 'error');
+        });
+    }
+
+    function reloadFromDatabricks() {
+      fetch('/reload_cache', { method: 'POST' })
+        .then(r => {
+          if (r.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          return r.json();
+        })
+        .then((data) => {
+          if (!data) return;
+          loadCount();
+          showStatus('✅ Count reloaded from Databricks', 'success');
+        })
+        .catch(err => {
+          console.error('Error reloading:', err);
+          showStatus('❌ Error reloading', 'error');
+        });
+    }
+
+    function showStatus(msg, type = 'success') {
+      const statusDiv = document.createElement('div');
+      statusDiv.className = 'status-message';
+      if (type === 'error') {
+        statusDiv.classList.add('status-error');
+      }
+      statusDiv.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${msg}`;
+      document.body.appendChild(statusDiv);
+
+      setTimeout(() => {
+        statusDiv.remove();
+      }, 3000);
+    }
+
+    // Search on Enter key
+    document.getElementById('searchBox').addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') {
+        search();
+      }
+    });
+  </script>
 </body>
+
 </html>
