@@ -15,7 +15,17 @@ string so the frontend's strict `===` comparisons work regardless of backend.
 import datetime
 import os
 
-TABLE = "spark_catalog.marketarm.tblentry"
+
+def _ident(part):
+    """Backtick-quote a SQL identifier (catalog/schema/table) from config."""
+    return "`" + part.strip().replace("`", "``") + "`"
+
+
+# Catalog and schema are configurable (set them in app.yaml); the table name is
+# fixed. Defaults preserve the original spark_catalog.marketarm.tblentry target.
+CATALOG = os.environ.get("DATABRICKS_CATALOG", "spark_catalog")
+SCHEMA = os.environ.get("DATABRICKS_SCHEMA", "marketarm")
+TABLE = f"{_ident(CATALOG)}.{_ident(SCHEMA)}.{_ident('tblentry')}"
 
 # Editable columns in display order. entryID is the key, managed by the app.
 FIELDS = [

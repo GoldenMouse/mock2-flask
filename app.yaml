@@ -13,3 +13,10 @@ env:
   # with `valueFrom` and delete this literal value.
   - name: DATABRICKS_HTTP_PATH
     value: "/sql/1.0/warehouses/REPLACE_WITH_WAREHOUSE_ID"
+
+  # Catalog and schema that hold the tblentry table. Change these to point the
+  # app at a different location without touching code.
+  - name: DATABRICKS_CATALOG
+    value: "spark_catalog"
+  - name: DATABRICKS_SCHEMA
+    value: "marketarm"
