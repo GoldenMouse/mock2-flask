@@ -1,0 +1,15 @@
+command:
+  - gunicorn
+  - app:app
+  - --bind
+  - 0.0.0.0:8000
+  - --workers
+  - "2"
+
+env:
+  # The SQL warehouse the app queries. Set this to your warehouse's HTTP path,
+  # e.g. /sql/1.0/warehouses/abc123def456. When you attach a SQL warehouse
+  # resource to the app in the Databricks UI, you can instead reference it here
+  # with `valueFrom` and delete this literal value.
+  - name: DATABRICKS_HTTP_PATH
+    value: "/sql/1.0/warehouses/REPLACE_WITH_WAREHOUSE_ID"

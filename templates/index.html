@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MarketArm — Entries</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #273449;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #0ea5e9;
+      --danger: #f87171;
+      --ok: #4ade80;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 20px 28px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+    header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+    header .sub { color: var(--muted); font-size: 13px; }
+    main { max-width: 1200px; margin: 0 auto; padding: 24px 28px 60px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 28px;
+    }
+    .card h2 { margin: 0 0 16px; font-size: 16px; }
+    form.entry-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px 18px;
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .field input[type="text"],
+    .field input[type="datetime-local"],
+    .field textarea {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .field input:focus, .field textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+    .field.checkbox { flex-direction: row; align-items: center; gap: 8px; }
+    .field.checkbox label { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+    .form-actions { grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 4px; }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 16px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .btn-primary { background: var(--accent-2); color: #041016; }
+    .btn-primary:hover { background: var(--accent); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); }
+    .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--border); }
+    .btn-danger:hover { background: var(--danger); color: #1a0505; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+    th { background: var(--panel-2); color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .5px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(56,189,248,.05); }
+    td.actions { display: flex; gap: 8px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .pill.on { background: rgba(74,222,128,.15); color: var(--ok); }
+    .pill.off { background: rgba(148,163,184,.15); color: var(--muted); }
+    .empty { padding: 40px; text-align: center; color: var(--muted); }
+    .desc-cell { max-width: 280px; white-space: normal; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MarketArm</h1>
+    <span class="sub">spark_catalog.marketarm.tblentry · {{ entries|length }} entries · {{ now }} UTC</span>
+  </header>
+
+  <main>
+    <!-- Create / Edit form -->
+    <section class="card">
+      <h2>{{ "Edit entry #" ~ editing.entryID if editing else "New entry" }}</h2>
+      <form class="entry-form" method="post" action="{{ url_for('index') }}">
+        <input type="hidden" name="action" value="{{ 'update' if editing else 'create' }}">
+        {% if editing %}
+        <input type="hidden" name="entryID" value="{{ editing.entryID }}">
+        {% endif %}
+
+        {% for f in fields %}
+          {% if f == 'Active' %}
+            <div class="field checkbox">
+              <input type="checkbox" id="{{ f }}" name="Active" {{ 'checked' if editing and editing.Active else '' }}>
+              <label for="{{ f }}">Active</label>
+            </div>
+          {% elif f == 'Description' %}
+            <div class="field" style="grid-column: 1 / -1;">
+              <label for="{{ f }}">{{ f }}</label>
+              <textarea id="{{ f }}" name="{{ f }}" rows="2">{{ editing[f] if editing and editing[f] is not none else '' }}</textarea>
+            </div>
+          {% elif f == 'LastWCDJ' %}
+            <div class="field">
+              <label for="{{ f }}">{{ f }} (YYYY-MM-DD HH:MM:SS)</label>
+              <input type="text" id="{{ f }}" name="{{ f }}" placeholder="2026-07-06 12:00:00"
+                     value="{{ editing[f] if editing and editing[f] is not none else '' }}">
+            </div>
+          {% else %}
+            <div class="field">
+              <label for="{{ f }}">{{ f }}</label>
+              <input type="text" id="{{ f }}" name="{{ f }}"
+                     value="{{ editing[f] if editing and editing[f] is not none else '' }}">
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">{{ "Save changes" if editing else "Create entry" }}</button>
+          {% if editing %}
+          <a href="{{ url_for('index') }}"><button type="button" class="btn-ghost">Cancel</button></a>
+          {% endif %}
+        </div>
+      </form>
+    </section>
+
+    <!-- List -->
+    <section>
+      <div class="table-wrap">
+        {% if entries %}
+        <table>
+          <thead>
+            <tr>
+              <th>entryID</th>
+              {% for f in fields %}<th>{{ f }}</th>{% endfor %}
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in entries %}
+            <tr>
+              <td>{{ e.entryID }}</td>
+              {% for f in fields %}
+                {% if f == 'Active' %}
+                  <td><span class="pill {{ 'on' if e.Active else 'off' }}">{{ 'Active' if e.Active else 'Inactive' }}</span></td>
+                {% elif f == 'Description' %}
+                  <td class="desc-cell">{{ e[f] if e[f] is not none else '' }}</td>
+                {% else %}
+                  <td>{{ e[f] if e[f] is not none else '' }}</td>
+                {% endif %}
+              {% endfor %}
+              <td class="actions">
+                <a href="{{ url_for('index', edit=e.entryID) }}"><button type="button" class="btn-ghost btn-sm">Edit</button></a>
+                <form method="post" action="{{ url_for('index') }}" onsubmit="return confirm('Delete entry #{{ e.entryID }}?');">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="entryID" value="{{ e.entryID }}">
+                  <button type="submit" class="btn-danger btn-sm">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No entries yet. Use the form above to create the first one.</div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+</body>
+</html>
