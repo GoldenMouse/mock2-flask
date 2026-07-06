@@ -26,9 +26,12 @@ CREATE TABLE spark_catalog.marketarm.tblentry (
     URL STRING,
     PriorWCDJ STRING,
     LastWCDJ TIMESTAMP,
-    userID STRING,
+    userID STRING,           -- creator identity (who created the entry)
     Description STRING,
-    Active BOOLEAN)
+    Active BOOLEAN,
+    createdAt TIMESTAMP,     -- when the entry was created
+    updatedBy STRING,        -- who last modified the entry
+    updatedAt TIMESTAMP)     -- when the entry was last modified
 USING delta
 TBLPROPERTIES (
     'delta.enableChangeDataFeed' = 'true',

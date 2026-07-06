@@ -123,8 +123,9 @@ def add():
     payload = request.get_json(force=True, silent=True) or {}
     if not (payload.get("nameEntry") or "").strip():
         return jsonify({"error": "Name is required"}), 400
-    values = data.coerce(payload, default_user_id=current_user()["userID"])
-    new_id = data.create_entry(values)
+    actor = current_user()["userID"]
+    values = data.coerce(payload, default_user_id=actor)
+    new_id = data.create_entry(values, actor)
     return jsonify({"success": True, "entryID": new_id})
 
 
@@ -135,7 +136,7 @@ def update():
     entry_id = int(payload["entryID"])
     if not (payload.get("nameEntry") or "").strip():
         return jsonify({"error": "Name is required"}), 400
-    data.update_entry(entry_id, data.coerce(payload))
+    data.update_entry(entry_id, data.coerce(payload), current_user()["userID"])
     return jsonify({"success": True})
 
 
@@ -151,7 +152,7 @@ def delete():
 @api
 def toggle_active():
     payload = request.get_json(force=True, silent=True) or {}
-    new_value = data.toggle_active(int(payload["entryID"]))
+    new_value = data.toggle_active(int(payload["entryID"]), current_user()["userID"])
     return jsonify({"success": True, "active": new_value})
 
 

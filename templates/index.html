@@ -763,10 +763,28 @@
             <input type="text" id="edit_entryID" readonly style="background: #f0f0f0;">
           </div>
 
-          <!-- User ID (read-only) -->
+          <!-- User ID / created by (read-only) -->
           <div class="modal-form-group">
-            <label>User ID</label>
+            <label>Created By (User ID)</label>
             <input type="text" id="edit_userID" readonly style="background: #f0f0f0;">
+          </div>
+
+          <!-- Created At (read-only, server-managed) -->
+          <div class="modal-form-group">
+            <label>Created At</label>
+            <input type="text" id="edit_createdAt" readonly style="background: #f0f0f0;">
+          </div>
+
+          <!-- Updated By (read-only, server-managed) -->
+          <div class="modal-form-group">
+            <label>Last Updated By</label>
+            <input type="text" id="edit_updatedBy" readonly style="background: #f0f0f0;">
+          </div>
+
+          <!-- Updated At (read-only, server-managed) -->
+          <div class="modal-form-group">
+            <label>Last Updated At</label>
+            <input type="text" id="edit_updatedAt" readonly style="background: #f0f0f0;">
           </div>
 
           <!-- Category -->
@@ -855,7 +873,7 @@
 
 
   <script>
-    const columns = ['entryID', 'userID', 'category', 'nameEntry', 'citizen', 'alias', 'alias2', 'alias3', 'URL', 'PriorWCDJ', 'LastWCDJ', 'Description', 'Active'];
+    const columns = ['entryID', 'userID', 'category', 'nameEntry', 'citizen', 'alias', 'alias2', 'alias3', 'URL', 'PriorWCDJ', 'LastWCDJ', 'Description', 'Active', 'createdAt', 'updatedBy', 'updatedAt'];
     let currentData = [];
     let searchTimeout = null;
     let currentUser = null; // NEW: Store current user
@@ -1155,6 +1173,11 @@
       // Populate the modal form with EXISTING values
       document.getElementById('edit_entryID').value = safeValue(entryData.entryID);
       document.getElementById('edit_userID').value = safeValue(entryData.userID);
+
+      // Audit fields (read-only, managed by the server)
+      document.getElementById('edit_createdAt').value = safeValue(entryData.createdAt);
+      document.getElementById('edit_updatedBy').value = safeValue(entryData.updatedBy);
+      document.getElementById('edit_updatedAt').value = safeValue(entryData.updatedAt);
       document.getElementById('edit_category').value = entryData.category || 'Individual';
       document.getElementById('edit_nameEntry').value = safeValue(entryData.nameEntry);
       document.getElementById('edit_citizen').value = safeValue(entryData.citizen);

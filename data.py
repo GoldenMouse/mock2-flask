@@ -73,13 +73,16 @@ def coerce(payload, default_user_id=None):
 
 
 def _serialize(row):
-    """Normalize a row for the frontend: entryID as string, dates as YYYY-MM-DD."""
+    """Normalize a row for the frontend: entryID as string, temporal values as
+    strings. LastWCDJ is a date (matches the date input); audit columns keep
+    their time component."""
     row = dict(row)
     if row.get("entryID") is not None:
         row["entryID"] = str(row["entryID"])
-    for key, value in row.items():
+    for key, value in list(row.items()):
         if isinstance(value, (datetime.date, datetime.datetime)):
-            row[key] = value.strftime("%Y-%m-%d")
+            fmt = "%Y-%m-%d" if key == "LastWCDJ" else "%Y-%m-%d %H:%M:%S"
+            row[key] = value.strftime(fmt)
     return row
 
 
@@ -136,10 +139,10 @@ def _db_count():
     return _query(f"SELECT COUNT(*) AS c FROM {TABLE}")[0]["c"]
 
 
-def _db_create(values):
+def _db_create(values, actor, now):
     next_id = _query(f"SELECT COALESCE(MAX(entryID), 0) + 1 AS nid FROM {TABLE}")[0]["nid"]
-    row = {**values, "entryID": next_id}
-    cols = ["entryID"] + FIELDS
+    row = {**values, "entryID": next_id, "createdAt": now, "updatedBy": actor, "updatedAt": now}
+    cols = ["entryID"] + FIELDS + ["createdAt", "updatedBy", "updatedAt"]
     placeholders = ", ".join(f"%({c})s" for c in cols)
     _query(
         f"INSERT INTO {TABLE} ({', '.join(cols)}) VALUES ({placeholders})",
@@ -149,9 +152,10 @@ def _db_create(values):
     return next_id
 
 
-def _db_update(entry_id, values):
-    row = {**values, "entryID": entry_id}
-    assignments = ", ".join(f"{c} = %({c})s" for c in FIELDS)
+def _db_update(entry_id, values, actor, now):
+    row = {**values, "entryID": entry_id, "updatedBy": actor, "updatedAt": now}
+    set_cols = FIELDS + ["updatedBy", "updatedAt"]
+    assignments = ", ".join(f"{c} = %({c})s" for c in set_cols)
     _query(
         f"UPDATE {TABLE} SET {assignments} WHERE entryID = %(entryID)s",
         row,
@@ -163,14 +167,15 @@ def _db_delete(entry_id):
     _query(f"DELETE FROM {TABLE} WHERE entryID = %(id)s", {"id": entry_id}, fetch=False)
 
 
-def _db_toggle(entry_id):
+def _db_toggle(entry_id, actor, now):
     current = _db_get(entry_id)
     if current is None:
         raise ValueError(f"Entry {entry_id} not found")
     new_value = not current.get("Active")
     _query(
-        f"UPDATE {TABLE} SET Active = %(a)s WHERE entryID = %(id)s",
-        {"a": new_value, "id": entry_id},
+        f"UPDATE {TABLE} SET Active = %(a)s, updatedBy = %(u)s, updatedAt = %(t)s "
+        f"WHERE entryID = %(id)s",
+        {"a": new_value, "u": actor, "t": now, "id": entry_id},
         fetch=False,
     )
     return new_value
@@ -194,6 +199,9 @@ _MOCK_ROWS = [
         "userID": "analyst01",
         "Description": "Listed for procurement network activity.",
         "Active": True,
+        "createdAt": datetime.datetime(2024, 6, 12, 9, 30, 0),
+        "updatedBy": "analyst01",
+        "updatedAt": datetime.datetime(2024, 6, 12, 9, 30, 0),
     },
     {
         "entryID": 2,
@@ -209,6 +217,9 @@ _MOCK_ROWS = [
         "userID": "analyst02",
         "Description": "Front company; shipping intermediary.",
         "Active": True,
+        "createdAt": datetime.datetime(2024, 2, 1, 14, 15, 0),
+        "updatedBy": "analyst02",
+        "updatedAt": datetime.datetime(2024, 2, 1, 14, 15, 0),
     },
     {
         "entryID": 3,
@@ -224,6 +235,9 @@ _MOCK_ROWS = [
         "userID": "analyst01",
         "Description": "Delisted after review.",
         "Active": False,
+        "createdAt": datetime.datetime(2022, 8, 19, 8, 0, 0),
+        "updatedBy": "analyst03",
+        "updatedAt": datetime.datetime(2023, 12, 20, 16, 45, 0),
     },
 ]
 
@@ -257,16 +271,25 @@ def _mock_count():
     return len(_MOCK_ROWS)
 
 
-def _mock_create(values):
+def _mock_create(values, actor, now):
     new_id = _mock_next_id()
-    _MOCK_ROWS.append({**values, "entryID": new_id})
+    _MOCK_ROWS.append(
+        {**values, "entryID": new_id, "createdAt": now, "updatedBy": actor, "updatedAt": now}
+    )
     return new_id
 
 
-def _mock_update(entry_id, values):
+def _mock_update(entry_id, values, actor, now):
     for i, r in enumerate(_MOCK_ROWS):
         if r["entryID"] == entry_id:
-            _MOCK_ROWS[i] = {**values, "entryID": entry_id}
+            # Merge over the existing row so createdAt (and userID) are preserved.
+            _MOCK_ROWS[i] = {
+                **r,
+                **values,
+                "entryID": entry_id,
+                "updatedBy": actor,
+                "updatedAt": now,
+            }
             break
 
 
@@ -275,11 +298,13 @@ def _mock_delete(entry_id):
     _MOCK_ROWS = [r for r in _MOCK_ROWS if r["entryID"] != entry_id]
 
 
-def _mock_toggle(entry_id):
+def _mock_toggle(entry_id, actor, now):
     row = _mock_get(entry_id)
     if row is None:
         raise ValueError(f"Entry {entry_id} not found")
     row["Active"] = not row.get("Active")
+    row["updatedBy"] = actor
+    row["updatedAt"] = now
     return row["Active"]
 
 
@@ -298,17 +323,25 @@ def get_entry(entry_id):
     return _mock_get(entry_id) if use_mock() else _db_get(entry_id)
 
 
-def create_entry(values):
-    return str(_mock_create(values) if use_mock() else _db_create(values))
+def create_entry(values, actor):
+    now = datetime.datetime.now()
+    new_id = _mock_create(values, actor, now) if use_mock() else _db_create(values, actor, now)
+    return str(new_id)
 
 
-def update_entry(entry_id, values):
-    return _mock_update(entry_id, values) if use_mock() else _db_update(entry_id, values)
+def update_entry(entry_id, values, actor):
+    now = datetime.datetime.now()
+    return (
+        _mock_update(entry_id, values, actor, now)
+        if use_mock()
+        else _db_update(entry_id, values, actor, now)
+    )
 
 
 def delete_entry(entry_id):
     return _mock_delete(entry_id) if use_mock() else _db_delete(entry_id)
 
 
-def toggle_active(entry_id):
-    return _mock_toggle(entry_id) if use_mock() else _db_toggle(entry_id)
+def toggle_active(entry_id, actor):
+    now = datetime.datetime.now()
+    return _mock_toggle(entry_id, actor, now) if use_mock() else _db_toggle(entry_id, actor, now)
