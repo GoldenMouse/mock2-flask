@@ -208,6 +208,21 @@ def _server_hostname(cfg):
     return urlparse(host).hostname
 
 
+def _describe_error(exc):
+    """Unwrap the exception chain so the real root cause is visible.
+
+    The SQL connector wraps failures as 'Error during request to server'; the
+    actual cause (ConnectionResetError, SSL cert failure, HTTP 403, ...) is
+    down the __cause__/__context__ chain.
+    """
+    parts, seen, cur = [], set(), exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        parts.append(f"{type(cur).__name__}: {cur}")
+        cur = cur.__cause__ or cur.__context__
+    return "  <-  ".join(parts)
+
+
 def _get_connection():
     from databricks import sql
     from databricks.sdk.core import Config
@@ -226,24 +241,39 @@ def _get_connection():
     # corporate VPN/proxy/firewall often resets ("connection aborted"). Set
     # USE_CLOUD_FETCH=0 to stream results inline through the warehouse instead.
     use_cloud_fetch = os.environ.get("USE_CLOUD_FETCH", "1") == "1"
+
+    connect_kwargs = dict(
+        server_hostname=server_hostname,
+        http_path=http_path,
+        credentials_provider=lambda: cfg.authenticate,
+        use_cloud_fetch=use_cloud_fetch,
+    )
+    # TLS escape hatches for corporate networks that intercept HTTPS. Point
+    # DATABRICKS_TLS_CA_FILE at your corporate CA bundle (.pem); as a last resort
+    # DATABRICKS_TLS_NO_VERIFY=1 disables verification (insecure — testing only).
+    ca_file = os.environ.get("DATABRICKS_TLS_CA_FILE")
+    if ca_file:
+        connect_kwargs["_tls_trusted_ca_file"] = ca_file
+    if os.environ.get("DATABRICKS_TLS_NO_VERIFY") == "1":
+        connect_kwargs["_tls_no_verify"] = True
+
     last_error = None
     for attempt in range(attempts):
         try:
-            return sql.connect(
-                server_hostname=server_hostname,
-                http_path=http_path,
-                credentials_provider=lambda: cfg.authenticate,
-                use_cloud_fetch=use_cloud_fetch,
-            )
+            return sql.connect(**connect_kwargs)
         except Exception as exc:  # noqa: BLE001 - retry transient cold-start resets
             last_error = exc
             wait = 2 * (2 ** attempt)  # 2s, 4s, 8s, ...
             log.warning(
-                "Warehouse connect attempt %d/%d failed (%s); retrying in %ss.",
-                attempt + 1, attempts, exc, wait,
+                "Warehouse connect attempt %d/%d failed; retrying in %ss. Cause: %s",
+                attempt + 1, attempts, wait, _describe_error(exc),
             )
             if attempt < attempts - 1:
                 time.sleep(wait)
+    log.error(
+        "Warehouse connection failed after %d attempts. Root cause: %s",
+        attempts, _describe_error(last_error),
+    )
     raise last_error
 
 
@@ -253,8 +283,12 @@ def _query(statement, params=None, fetch=True):
             cur.execute(statement, params or {})
             if not fetch:
                 return None
-            columns = [c[0] for c in cur.description]
-            return [dict(zip(columns, row)) for row in cur.fetchall()]
+            # Convert the Arrow result to row dicts ourselves via to_pylist().
+            # This bypasses the connector's fetchall() -> _convert_arrow_table ->
+            # df.to_numpy(na_value=None) path, which raises a TypeError on integer
+            # columns with some pandas versions. to_pylist() maps column names to
+            # native Python values (ints, None, datetime) directly.
+            return cur.fetchall_arrow().to_pylist()
 
 
 def _db_search(q, show_inactive, limit):
