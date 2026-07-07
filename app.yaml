@@ -13,12 +13,20 @@ command:
   - "120"
 
 env:
-  # The SQL warehouse the app queries. Set this to your warehouse's HTTP path,
-  # e.g. /sql/1.0/warehouses/abc123def456. When you attach a SQL warehouse
-  # resource to the app in the Databricks UI, you can instead reference it here
-  # with `valueFrom` and delete this literal value.
+  # The SQL warehouse the app queries. Copy "HTTP path" from the warehouse's
+  # Connection details tab (SQL Warehouses -> your warehouse -> Connection
+  # details), e.g. /sql/1.0/warehouses/abc123def456. When you attach a SQL
+  # warehouse resource to the app in the Databricks UI, you can instead
+  # reference it here with `valueFrom` and delete this literal value.
   - name: DATABRICKS_HTTP_PATH
     value: "/sql/1.0/warehouses/REPLACE_WITH_WAREHOUSE_ID"
+
+  # The server hostname is derived automatically from DATABRICKS_HOST (which the
+  # Apps runtime injects) with the scheme stripped. Only set this if you need to
+  # override it — use the exact bare "Server hostname" from the same Connection
+  # details tab (e.g. dbc-xxxx.cloud.databricks.com, NO https://).
+  # - name: DATABRICKS_SERVER_HOSTNAME
+  #   value: "dbc-xxxx.cloud.databricks.com"
 
   # Catalog and schema that hold the tblentry table. Change these to point the
   # app at a different location without touching code.

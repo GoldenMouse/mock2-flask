@@ -18,6 +18,7 @@ import os
 import re
 import threading
 import time
+from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 
@@ -189,6 +190,24 @@ def ensure_warehouse_running():
                 log.warning("Could not issue warehouse start (%s).", exc)
 
 
+def _server_hostname(cfg):
+    """Return the bare warehouse host (no scheme/path).
+
+    sql.connect's server_hostname must be a hostname like
+    'dbc-xxxx.cloud.databricks.com'. DATABRICKS_HOST / cfg.host include the
+    'https://' scheme, which would cause a DNS/name-resolution error if passed
+    straight through. DATABRICKS_SERVER_HOSTNAME overrides this if set (use the
+    exact 'Server hostname' from the warehouse's Connection details tab).
+    """
+    override = os.environ.get("DATABRICKS_SERVER_HOSTNAME")
+    if override:
+        return override.strip().replace("https://", "").replace("http://", "").strip("/")
+    host = (cfg.host or "").strip()
+    if "://" not in host:
+        host = "https://" + host
+    return urlparse(host).hostname
+
+
 def _get_connection():
     from databricks import sql
     from databricks.sdk.core import Config
@@ -199,7 +218,9 @@ def _get_connection():
     ensure_warehouse_running()
 
     cfg = Config()
+    server_hostname = _server_hostname(cfg)
     http_path = os.environ["DATABRICKS_HTTP_PATH"]
+    log.info("Connecting to warehouse host=%s http_path=%s", server_hostname, http_path)
     attempts = int(os.environ.get("CONNECT_RETRIES", "4"))
     # Cloud Fetch downloads results directly from cloud object storage, which a
     # corporate VPN/proxy/firewall often resets ("connection aborted"). Set
@@ -209,7 +230,7 @@ def _get_connection():
     for attempt in range(attempts):
         try:
             return sql.connect(
-                server_hostname=cfg.host,
+                server_hostname=server_hostname,
                 http_path=http_path,
                 credentials_provider=lambda: cfg.authenticate,
                 use_cloud_fetch=use_cloud_fetch,
