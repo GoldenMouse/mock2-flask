@@ -702,7 +702,7 @@
         <label for="active" style="margin: 0;">Active</label>
       </div>
 
-      <button class="btn btn-primary" onclick="addEntry()">
+      <button class="btn btn-primary" id="addBtn" onclick="addEntry()">
         <i class="fas fa-plus"></i> Add Entry
       </button>
     </div>
@@ -943,7 +943,7 @@
           if (s && s.ready) {
             warehouseReady = true;
             loadCount();
-            showDefaultResults();
+            loadAll();  // auto-show entries once the warehouse is ready
           } else {
             warehouseReady = false;
             const state = (s && s.state) ? ' (' + s.state + ')' : '';
@@ -968,6 +968,13 @@
       return true;
     }
 
+    // Re-run whatever list is currently shown (a search, or "show all") so that
+    // adds/edits/deletes/toggles are reflected without the user clicking again.
+    function refreshCurrentView() {
+      const q = document.getElementById('searchBox').value.trim();
+      if (q) { search(); } else { loadAll(); }
+    }
+
     function loadCount() {
       fetch('/get_count')
         .then(r => {
@@ -987,8 +994,9 @@
         });
     }
 
-    function showLoading() {
-      document.getElementById('results').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    function showLoading(message) {
+      document.getElementById('results').innerHTML =
+        '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' + (message || 'Loading…') + '</div>';
     }
 
     function loadAll() {
@@ -1100,6 +1108,11 @@
         return;
       }
 
+      const addBtn = document.getElementById('addBtn');
+      const addBtnHtml = addBtn.innerHTML;
+      addBtn.disabled = true;
+      addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding…';
+
       fetch('/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1118,10 +1131,7 @@
             showStatus(`✅ Added: ${entry.nameEntry} (ID: ${data.entryID})`, 'success');
             clearForm();
             loadCount();
-            // Optionally refresh search
-            if (document.getElementById('searchBox').value) {
-              search();
-            }
+            refreshCurrentView();  // show the new row without clicking "Show All"
           } else {
             showStatus('❌ Error adding entry: ' + (data.error || 'Unknown error'), 'error');
           }
@@ -1129,6 +1139,10 @@
         .catch(err => {
           console.error('Error adding entry:', err);
           showStatus('❌ Error adding entry', 'error');
+        })
+        .finally(() => {
+          addBtn.disabled = false;
+          addBtn.innerHTML = addBtnHtml;
         });
     }
 
@@ -1332,14 +1346,7 @@
           if (data.success) {
             showStatus(`✅ Changes saved for ${nameEntry}!`, 'success');
             closeEditModal();
-
-            // Refresh the current search/view
-            const searchBox = document.getElementById('searchBox');
-            if (searchBox.value.trim()) {
-              search();
-            } else {
-              loadAll();
-            }
+            refreshCurrentView();
           } else {
             showStatus('❌ Error updating: ' + (data.error || 'Unknown error'), 'error');
           }
@@ -1375,6 +1382,7 @@
 
     function toggleActive(entryID) {
       if (!requireWarehouse()) return;
+      showLoading('Updating…');
       fetch('/toggle_active', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1391,21 +1399,22 @@
           if (!data) return;
           if (data.success) {
             showStatus(`✅ Entry ${data.active ? 'activated' : 'deactivated'}`, 'success');
-            // Refresh search
-            search();
           } else {
             showStatus('❌ Error toggling status: ' + (data.error || 'Unknown error'), 'error');
           }
+          refreshCurrentView();
         })
         .catch(err => {
           console.error('Error toggling active:', err);
           showStatus('❌ Error toggling status', 'error');
+          refreshCurrentView();
         });
     }
 
     function deleteRow(entryID) {
       if (!requireWarehouse()) return;
       if (!confirm('Are you sure you want to delete this entry?')) return;
+      showLoading('Deleting…');
 
       fetch('/delete', {
         method: 'POST',
@@ -1424,15 +1433,15 @@
           if (data.success) {
             showStatus('✅ Entry deleted', 'success');
             loadCount();
-            // Refresh search
-            search();
           } else {
             showStatus('❌ Error deleting: ' + (data.error || 'Unknown error'), 'error');
           }
+          refreshCurrentView();
         })
         .catch(err => {
           console.error('Error deleting:', err);
           showStatus('❌ Error deleting', 'error');
+          refreshCurrentView();
         });
     }
 
