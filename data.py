@@ -201,6 +201,10 @@ def _get_connection():
     cfg = Config()
     http_path = os.environ["DATABRICKS_HTTP_PATH"]
     attempts = int(os.environ.get("CONNECT_RETRIES", "4"))
+    # Cloud Fetch downloads results directly from cloud object storage, which a
+    # corporate VPN/proxy/firewall often resets ("connection aborted"). Set
+    # USE_CLOUD_FETCH=0 to stream results inline through the warehouse instead.
+    use_cloud_fetch = os.environ.get("USE_CLOUD_FETCH", "1") == "1"
     last_error = None
     for attempt in range(attempts):
         try:
@@ -208,6 +212,7 @@ def _get_connection():
                 server_hostname=cfg.host,
                 http_path=http_path,
                 credentials_provider=lambda: cfg.authenticate,
+                use_cloud_fetch=use_cloud_fetch,
             )
         except Exception as exc:  # noqa: BLE001 - retry transient cold-start resets
             last_error = exc
