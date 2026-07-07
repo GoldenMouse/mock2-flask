@@ -27,11 +27,8 @@ env:
   - name: DATABRICKS_SCHEMA
     value: "marketarm"
 
-  # If the SQL warehouse is stopped, the app starts it in a background thread at
-  # boot and the UI waits (with a banner) until it's RUNNING — a cold classic
-  # warehouse can take ~10 minutes. Set AUTO_START_WAREHOUSE to "0" to disable;
-  # WAREHOUSE_START_TIMEOUT is how long (seconds) the warm-up waits.
+  # If the SQL warehouse is stopped, the app starts it on demand when a user
+  # opens the app; the UI shows a loading state until it's RUNNING (a cold
+  # classic warehouse can take ~10 minutes). Set to "0" to disable auto-start.
   - name: AUTO_START_WAREHOUSE
     value: "1"
-  - name: WAREHOUSE_START_TIMEOUT
-    value: "900"

@@ -85,21 +85,6 @@
       transform: translateY(-2px);
     }
 
-    /* Warehouse warming-up banner */
-    .warehouse-banner {
-      background: #fff3cd;
-      color: #856404;
-      border: 1px solid #ffe69c;
-      padding: 14px 20px;
-      border-radius: 10px;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-weight: 600;
-    }
-
     .header {
       background: white;
       padding: 30px;
@@ -634,12 +619,6 @@
 
 <body>
   <div class="container">
-    <!-- Warehouse warming-up banner (shown until the SQL warehouse is RUNNING) -->
-    <div id="warehouseBanner" class="warehouse-banner" style="display: none;">
-      <i class="fas fa-spinner fa-spin"></i>
-      <span id="warehouseBannerText">Starting SQL warehouse…</span>
-    </div>
-
     <!-- NEW: User Header Bar -->
     <div class="user-header">
       <div class="user-info">
@@ -956,24 +935,21 @@
       document.getElementById('results').innerHTML = '<div class="no-results"><i class="fas fa-search"></i><br>Enter a search term to find entries<br><small>Or click "Show All" to see recent entries (limited to 100)</small></div>';
     }
 
-    // Poll warehouse status; hold data actions until the warehouse is RUNNING.
+    // Poll warehouse status; show a loading state in the table until it's RUNNING.
     function waitForWarehouse() {
       fetch('/api/warehouse_status')
         .then(r => r.json())
         .then(s => {
           if (s && s.ready) {
             warehouseReady = true;
-            document.getElementById('warehouseBanner').style.display = 'none';
             loadCount();
             showDefaultResults();
           } else {
             warehouseReady = false;
             const state = (s && s.state) ? ' (' + s.state + ')' : '';
-            document.getElementById('warehouseBannerText').textContent =
-              'Starting SQL warehouse' + state + '… the first load can take up to ~10 minutes. This page updates automatically.';
-            document.getElementById('warehouseBanner').style.display = 'flex';
             document.getElementById('results').innerHTML =
-              '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Waiting for the SQL warehouse to start…</div>';
+              '<div class="loading"><i class="fas fa-spinner fa-spin"></i><br>Starting SQL warehouse' + state +
+              '… this can take up to ~10 minutes.<br><small>This page updates automatically.</small></div>';
             setTimeout(waitForWarehouse, 5000);
           }
         })
